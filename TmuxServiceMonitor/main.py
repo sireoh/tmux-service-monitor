@@ -55,6 +55,7 @@ def index():
                 });
 
                 fetchServices();
+                fetchSessions();g
             }
 
             async function stopService(session, window) {
@@ -135,8 +136,19 @@ def start_service():
     if not service_name or not command or not session:
         return jsonify({"error": "Missing fields"}), 400
 
-    run_command(f"tmux new-window -t {session} -n {service_name} '{command}'")
-    return jsonify({"message": f"Started window '{service_name}' in session '{session}'"}), 200
+    # Escape single quotes inside the command
+    safe_command = command.replace("'", "'\"'\"'")
+
+    # Run tmux command properly quoted
+    full_cmd = f"tmux new-window -t {session} -n {service_name} \"bash -c '{safe_command}'\""
+    result = run_command(full_cmd)
+
+    return jsonify({
+        "message": f"Started window '{service_name}' in session '{session}'",
+        "debug_command": full_cmd,
+        "output": result
+    }), 200
+
 
 @app.route('/stop', methods=['POST'])
 def stop_service():
