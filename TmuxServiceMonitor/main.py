@@ -136,11 +136,8 @@ def start_service():
     if not service_name or not command or not session:
         return jsonify({"error": "Missing fields"}), 400
 
-    # Escape single quotes inside the command
-    safe_command = command.replace("'", "'\"'\"'")
-
-    # Run tmux command properly quoted
-    full_cmd = f"tmux new-window -t {session} -n {service_name} \"bash -c '{safe_command}'\""
+    # Run tmux command directly (no bash -c)
+    full_cmd = f"tmux new-window -t {session} -n {service_name} \"{command}\""
     result = run_command(full_cmd)
 
     return jsonify({
@@ -148,7 +145,6 @@ def start_service():
         "debug_command": full_cmd,
         "output": result
     }), 200
-
 
 @app.route('/stop', methods=['POST'])
 def stop_service():
