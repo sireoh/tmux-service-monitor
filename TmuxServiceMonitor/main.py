@@ -22,8 +22,8 @@ def index():
                 let data = await response.json();
                 document.getElementById("services").innerHTML = data.services.map(s => `
                     <li>
-                        ${s.session}:${s.window} 
-                        <button onclick="stopService('${s.session}', '${s.window}')">Stop</button>
+                        ${s.session}:${s.window_name} (index ${s.window_index})
+                        <button onclick="stopService('${s.session}', '${s.window_index}')">Stop</button>
                         <button onclick="checkStatus('${s.session}')">Check Session Status</button>
                     </li>
                 `).join('');
@@ -109,18 +109,21 @@ def list_sessions():
 
 @app.route('/services', methods=['GET'])
 def list_services():
-    output = run_command("tmux list-windows -a")
+    output = run_command("tmux list-windows -a -F '#S:#I:#W'")
     services = []
     for line in output.split("\n"):
         if line:
             try:
-                parts = line.split(":")
-                session = parts[0]
-                window = parts[1].split()[1]  # [1] skips window index, takes window name
-                services.append({"session": session, "window": window})
-            except IndexError:
+                session, window_index, window_name = line.split(":")
+                services.append({
+                    "session": session,
+                    "window_index": window_index,
+                    "window_name": window_name
+                })
+            except ValueError:
                 continue
     return jsonify({"services": services})
+
 
 @app.route('/start', methods=['POST'])
 def start_service():
@@ -155,4 +158,3 @@ def service_status():
 
 if __name__ == '__main__':
     app.run(host='0.0.0.0', port=5000)
-c
