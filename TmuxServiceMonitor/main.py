@@ -46,7 +46,7 @@ def index():
 
                 if (!name || !commandRaw || !session) return alert("Fill in all fields!");
 
-                let command = commandRaw.split('\\n').map(line => line.trim()).filter(line => line).join(' && ');
+                let command = commandRaw.split('\n').map(line => line.trim()).filter(line => line).join(' && ');
 
                 await fetch('/start', { 
                     method: 'POST', 
@@ -125,7 +125,6 @@ def list_services():
                 continue
     return jsonify({"services": services})
 
-
 @app.route('/start', methods=['POST'])
 def start_service():
     data = request.json
@@ -136,8 +135,8 @@ def start_service():
     if not service_name or not command or not session:
         return jsonify({"error": "Missing fields"}), 400
 
-    # Run tmux command directly (no bash -c)
-    full_cmd = f"tmux new-window -t {session} -n {service_name} \"{command}\""
+    # Safely wrap the command
+    full_cmd = f'tmux new-window -t {session} -n {service_name} "bash -c \'{command}\'"'
     result = run_command(full_cmd)
 
     return jsonify({
