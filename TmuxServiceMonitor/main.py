@@ -55,7 +55,7 @@ def index():
                 });
 
                 fetchServices();
-                fetchSessions();g
+                fetchSessions();
             }
 
             async function stopService(session, window) {
