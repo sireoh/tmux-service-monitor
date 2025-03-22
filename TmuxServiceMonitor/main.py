@@ -28,69 +28,98 @@ def index():
                     </li>
                 `).join('');
             }
-
+            
+            async function fetchSessions() {
+                let response = await fetch('/sessions');
+                let data = await response.json();
+                document.getElementById("session_radios").innerHTML = data.sessions.map((s, i) => `
+                    <label>
+                        <input type="radio" name="session" value="${s}" ${i === 0 ? 'checked' : ''}> ${s}
+                    </label><br>
+                `).join('');
+            }
+            
             async function startService() {
                 let name = document.getElementById("service_name").value;
-                let command = document.getElementById("service_command").value;
-                if (!name || !command) return alert("Enter both name and command!");
+                let commandRaw = document.getElementById("service_command").value;
+                let session = document.querySelector('input[name="session"]:checked')?.value;
+            
+                if (!name || !commandRaw || !session) return alert("Fill in all fields!");
+            
+                let command = commandRaw.split('\n').map(line => line.trim()).filter(line => line).join(' && ');
+                
                 await fetch('/start', { 
                     method: 'POST', 
                     headers: {'Content-Type': 'application/json'},
-                    body: JSON.stringify({name, command})
+                    body: JSON.stringify({name, command, session})
                 });
+            
                 fetchServices();
             }
-
-            async function stopService(name) {
-                await fetch('/stop', { 
-                    method: 'POST', 
-                    headers: {'Content-Type': 'application/json'},
-                    body: JSON.stringify({name})
-                });
+            
+            window.onload = () => {
                 fetchServices();
-            }
+                fetchSessions();
+            };
 
-            async function checkStatus(name) {
-                let response = await fetch('/status?name=' + name);
-                let data = await response.json();
-                alert("Status of " + name + ": " + data.status);
-            }
-
-            window.onload = fetchServices;
         </script>
     </head>
     <body>
         <div>Tmux Service Manager</div>
         <div>Running Services</div>
-        <ul id="services">nothing atm</ul>
-        <div>Start New Service</div>
+        <ul id="processes">Loading processes...</ul>
+        <div>Start New Process</div>
         <div>
-            <div>name:</div>
-            <input type="text" id="service_name">
+            <div>Process Name:</div>
+            <input type="text" id="process_name">
         
-            <div>command:</div>
-            <textarea id="service_command"></textarea>
+            <div>Command:</div>
+            <textarea id="service_command" rows="4" cols="50"></textarea>
         
-            <div><button onclick="startService()">start</button></div>
+            <div>Select Session:</div>
+            <div id="session_radios">Loading sessions...</div>
+        
+            <div><button onclick="startService()">Start</button></div>
         </div>
+
     </body>
     </html>
     """)
 
-@app.route('/services', methods=['GET'])
-def list_services():
+@app.route('/sessions', methods=['GET'])
+def list_sessions():
     output = run_command("tmux list-sessions")
-    services = [line.split(":")[0] for line in output.split("\n") if line]
-    return jsonify({"services": services})
+    sessions = [line.split(":")[0] for line in output.split("\n") if line]
+    return jsonify({"sessions": sessions})
+
+@app.route('/processes', methods=['GET'])
+def list_services():
+    output = run_command("tmux list-windows -a")
+    processes = []
+    for line in output.split("\n"):
+        if line:
+            try:
+                # Get the third colon-separated part, then extract the first word (the window name)
+                window_name = line.split(":")[2].split()[0]
+                processes.append(window_name)
+            except IndexError:
+                continue  # skip lines that don't match expected format
+    return jsonify({"processes": processes})
+
 
 @app.route('/start', methods=['POST'])
 def start_service():
     service_name = request.json.get("name")
     command = request.json.get("command")
-    if not service_name or not command:
-        return jsonify({"error": "Missing service name or command"}), 400
-    run_command(f"tmux new-session -d -s {service_name} '{command}'")
-    return jsonify({"message": f"Started {service_name}"}), 200
+    session = request.json.get("session")
+
+    if not service_name or not command or not session:
+        return jsonify({"error": "Missing window name, command, or session"}), 400
+
+    # Create a new window inside the existing session
+    run_command(f"tmux new-window -t {session} -n {service_name} '{command}'")
+    return jsonify({"message": f"Started window '{service_name}' in session '{session}'"}), 200
+
 
 @app.route('/stop', methods=['POST'])
 def stop_service():
@@ -105,6 +134,8 @@ def service_status():
     service_name = request.args.get("name")
     output = run_command(f"tmux has-session -t {service_name} 2>/dev/null && echo 'running' || echo 'stopped'")
     return jsonify({"status": output})
+
+
 
 if __name__ == '__main__':
     app.run(host='0.0.0.0', port=5000)
