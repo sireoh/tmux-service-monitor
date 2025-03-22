@@ -46,7 +46,7 @@ def index():
 
                 if (!name || !commandRaw || !session) return alert("Fill in all fields!");
 
-                let command = commandRaw.split('\\n').map(line => line.trim()).filter(line => line).join(' && ');g
+                let command = commandRaw.split('\\n').map(line => line.trim()).filter(line => line).join(' && ');
 
                 await fetch('/start', { 
                     method: 'POST', 
